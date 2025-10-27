@@ -7,7 +7,7 @@ from utils.wait_utils import wait_for_presence
 @allure.feature('Login')
 @allure.story('Valid and invalid login flows')
 def test_valid_login(driver, base_config):
-    """Positive login flow using Page Object Model.""
+    """Positive login flow using Page Object Model."""
 
     login = LoginPage(driver)
     with allure.step('Load login page'):
