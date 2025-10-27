@@ -1,0 +1,401 @@
+## checklist for this app
+
+Nice — good question. Below I’ll point exactly to every place in the demo repo you may need to change for your real app, tell you why to change it, and give short copy-paste edits/examples so you can do it safely.
+
+I’ll group by purpose (URLs/config, locators, credentials/testdata, driver options, waits/timeouts, reporting/CI, other). Wherever possible I’ll show the file + the exact variable/line to edit and a short snippet you can paste.
+
+
+---
+
+1) Change the base URL & environment config
+
+File: conftest.py
+Location: base_config() fixture near top.
+
+What to change:
+
+base_url → change to your application’s root (e.g. https://staging.myapp.com)
+
+headless → True for CI, False for local development.
+
+
+Example edit (simple):
+
+# conftest.py
+@pytest.fixture(scope="session")
+def base_config():
+    return {
+        "base_url": "https://staging.myapp.com",  # <- change this
+        "headless": False,                        # <- change for local/CI
+    }
+
+Better: use environment variables (recommended):
+
+import os
+
+@pytest.fixture(scope="session")
+def base_config():
+    return {
+        "base_url": os.environ.get("BASE_URL", "https://staging.myapp.com"),
+        "headless": os.environ.get("HEADLESS", "True").lower() == "true"
+    }
+
+You can then run:
+
+BASE_URL="https://prod.myapp.com" HEADLESS=False pytest -q
+
+
+---
+
+2) Change locators (IDs/XPaths/CSS)
+
+Files: pages/login_page.py, pages/* (any page objects)
+
+What to change:
+
+Replace the (By.ID, "username") style locators with the real locators from your app.
+
+Prefer stable locators: IDs > name > CSS selectors > XPath (use XPath only if needed).
+
+
+Example — update locators in login_page.py:
+
+# BEFORE
+USERNAME = (By.ID, "username")
+PASSWORD = (By.ID, "password")
+LOGIN_BTN = (By.ID, "loginBtn")
+
+# AFTER (example if app uses different attributes)
+USERNAME = (By.NAME, "user_email")
+PASSWORD = (By.NAME, "user_password")
+LOGIN_BTN = (By.CSS_SELECTOR, "button[type='submit']")
+# or
+LOGIN_BTN = (By.XPATH, "//button[contains(text(),'Sign in')]")
+
+Quick tips:
+
+To find locators open Chrome DevTools (Right-click → Inspect).
+
+Prefer attributes that are stable and unlikely to change (e.g., data-test-id="login-button" if your devs add them).
+
+
+
+---
+
+3) Change test data and credentials
+
+Files: resources/testdata.json, tests/*.py
+
+What to change:
+
+Put real test users, roles, or test inputs in resources/testdata.json or a secure vault.
+
+Never commit real production credentials. Use environment variables or CI secrets.
+
+
+Example resources/testdata.json:
+
+{
+  "users": [
+    { "username": "testuser@company.com", "password": "Test@123" }
+  ]
+}
+
+Use env vars in tests:
+
+import os
+
+username = os.environ.get("TEST_USER", "testuser@company.com")
+password = os.environ.get("TEST_PASS", "Test@123")
+login.login(username, password)
+
+
+---
+
+4) Where to change waits / timeouts
+
+Files: conftest.py (implicit wait), utils/wait_utils.py
+
+What to change:
+
+driver.implicitly_wait(5) in conftest.py — you can increase if app is slow, but prefer explicit waits.
+
+wait_for_element_clickable(..., timeout=15) — adjust default timeout to match your app performance (10–30s typical).
+
+
+Example:
+
+# conftest.py
+driver.implicitly_wait(3)  # keep low; rely on explicit waits
+
+# utils/wait_utils.py
+def wait_for_element_clickable(driver, by, locator, timeout=20):
+    ...
+
+
+---
+
+5) Driver / Browser options
+
+Files: utils/browser_factory.py and conftest.py (if you change creation logic)
+
+What to change:
+
+Headless mode flags, window-size, download prefs, profile options
+
+Add proxy, user-agent, or custom capabilities if needed
+
+Replace webdriver-manager usage with your corporate driver management if required.
+
+
+Example add download prefs (Chrome):
+
+options.add_experimental_option("prefs", {
+    "download.default_directory": "/tmp/downloads",
+    "profile.default_content_settings.popups": 0
+})
+
+Example to use remote Selenium Grid (BrowserStack/Remote WebDriver):
+
+from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
+def create_remote_driver():
+    capabilities = DesiredCapabilities.CHROME.copy()
+    # set capabilities or use BrowserStack options
+    driver = webdriver.Remote(
+        command_executor="http://<grid-host>:4444/wd/hub",
+        desired_capabilities=capabilities
+    )
+    return driver
+
+
+---
+
+6) Where to change screenshot path / failure handling
+
+File: conftest.py, inside pytest_runtest_makereport
+
+What to change:
+
+os.path.join("screenshots", f"{item.name}.png") — change folder, add timestamp, or attach to Allure
+
+
+Example with timestamp:
+
+import time
+fname = f"{item.name}_{int(time.time())}.png"
+path = os.path.join("reports", "screenshots", fname)
+
+If using Allure, attach:
+
+import allure
+with open(path, "rb") as f:
+    allure.attach(f.read(), name=item.name, attachment_type=allure.attachment_type.PNG)
+
+
+---
+
+7) Change tests for pages / assertions / flows
+
+Files: tests/test_login.py, tests/test_search.py
+
+What to change:
+
+Tests expect certain behaviors (e.g., assert "dashboard" in driver.current_url); update based on your app’s success condition: element visible, URL change, toast message, etc.
+
+
+Example better assertion:
+
+from selenium.webdriver.common.by import By
+from utils.wait_utils import wait_for_presence
+
+# wait for a known dashboard element
+el = wait_for_presence(driver, By.CSS_SELECTOR, ".dashboard-header", timeout=20)
+assert el.is_displayed()
+
+
+---
+
+8) CI / Jenkins config
+
+File: Jenkinsfile, also .github/workflows/*.yml if using GitHub Actions (not included)
+
+What to change:
+
+Installation commands (use your project’s dependency file)
+
+Environment variables for BASE_URL, credentials, and secrets via Jenkins credentials store
+
+Use headless true for CI and set browser driver path if not using webdriver-manager
+
+
+Example in Jenkinsfile stage:
+
+stage('Test') {
+  steps {
+    withEnv(["BASE_URL=https://staging.myapp.com", "HEADLESS=true"]) {
+      sh 'pytest --alluredir=allure-results'
+    }
+  }
+}
+
+
+---
+
+9) pytest.ini, markers, test discovery
+
+File: pytest.ini
+
+What to change:
+
+testpaths if tests live in a different folder
+
+Add custom markers (smoke, regression) and register them
+
+addopts for default flags like --maxfail=1 --html=report.html
+
+
+Example:
+
+[pytest]
+addopts = -ra -q --maxfail=1
+testpaths = tests
+markers = smoke regression ui
+
+
+---
+
+10) Where to add new Page Objects
+
+Folder: pages/
+
+How to add:
+
+For each new page screen create pages/<page_name>_page.py inheriting BasePage.
+
+Put locators as class constants; actions as methods.
+
+
+Example dashboard_page.py:
+
+class DashboardPage(BasePage):
+    WELCOME_MSG = (By.CSS_SELECTOR, ".welcome")
+    def get_welcome(self):
+        return self.driver.find_element(*self.WELCOME_MSG).text
+
+
+---
+
+11) Where to change utilities
+
+Files: utils/actions_utils.py, utils/wait_utils.py, utils/browser_factory.py
+
+What to change:
+
+Add helper actions needed by app (drag/drop, double click, API setup)
+
+Add retry wrappers for flaky flows
+
+Centralize JS execution helpers if needed
+
+
+
+---
+
+12) Security: secrets and credentials
+
+Where:
+
+resources/testdata.json (avoid putting secrets)
+
+Use environment vars in CI for secrets
+
+
+Example using env in conftest:
+
+import os
+username = os.environ.get("TEST_USER")
+password = os.environ.get("TEST_PASS")
+
+
+---
+
+13) Logging / debug settings
+
+Add logging in conftest.py or utils:
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info("Starting test ...")
+
+
+---
+
+14) Summary checklist — files to edit for your app
+
+conftest.py → base_config["base_url"], headless, implicit waits, screenshot folder, remote driver logic
+
+pages/*.py → ALL locators and page-specific actions
+
+tests/*.py → test flows, assertions, and test data usage
+
+resources/testdata.json → test users & input data
+
+utils/browser_factory.py → driver options, remote/grid settings, download prefs
+
+utils/wait_utils.py → timeouts tuning
+
+pytest.ini → markers, default CLI flags
+
+Jenkinsfile or CI YAML → env vars, headless, commands, reporting
+
+requirements.txt → add any libs your app needs
+
+
+
+---
+
+Quick real example showing an end-to-end edit
+
+Suppose your app login page is at https://staging.myapp.com/accounts/signin and fields are:
+
+Email input: input#email
+
+Password input: input#pass
+
+Submit button: <button data-test='signin-btn'>Sign in</button>
+
+
+Change these:
+
+1. conftest.py:
+
+
+
+return {"base_url": "https://staging.myapp.com", "headless": True}
+
+2. pages/login_page.py:
+
+
+
+USERNAME = (By.CSS_SELECTOR, "input#email")
+PASSWORD = (By.CSS_SELECTOR, "input#pass")
+LOGIN_BTN = (By.CSS_SELECTOR, "button[data-test='signin-btn']")
+
+3. tests/test_login.py assertion:
+
+
+
+from utils.wait_utils import wait_for_presence
+dashboard_el = wait_for_presence(driver, By.CSS_SELECTOR, ".dashboard-main", timeout=20)
+assert dashboard_el.is_displayed()
+
+4. Run locally:
+
+
+
+BASE_URL="https://staging.myapp.com" HEADLESS=False pytest tests/test_login.py -q -s
+
+
