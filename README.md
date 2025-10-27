@@ -197,18 +197,6 @@ Recognize @pytest.mark.smoke decorators
 
 
 
----
-
-🧠 Interview Tip:
-
-They might ask:
-
-> “What’s the difference between pytest.ini, conftest.py, and requirements.txt?”
-
-
-
-Answer:
-
 pytest.ini → configuration file for pytest behavior
 
 conftest.py → reusable fixtures, hooks, setup/teardown logic
