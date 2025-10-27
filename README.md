@@ -225,3 +225,6 @@ conftest.py	Global setup → creates driver, base URL, hooks, fixtures
 base_page.py	Common reusable methods for all pages (load, click, wait, type, find)
 login_page.py	Child page → specific locators & actions (like login())
 test_login.py	Actual test → uses page objects and fixtures
+
+✅ super().load() → needed because you’re overriding load() to add /login
+❌ super().click() → not needed because you’re not overriding click(); just calling it normally
