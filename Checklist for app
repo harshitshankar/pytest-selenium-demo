@@ -399,3 +399,32 @@ assert dashboard_el.is_displayed()
 BASE_URL="https://staging.myapp.com" HEADLESS=False pytest tests/test_login.py -q -s
 
 
+
+Let’s break it down line by line:
+
+Line	Meaning
+
+os.environ.get("BASE_URL", "https://staging.myapp.com")	Looks for an environment variable named BASE_URL. If not found, uses "https://staging.myapp.com" as default.
+os.environ.get("HEADLESS", "True")	Looks for HEADLESS. If not found, defaults to "True".
+.lower() == "true"	Converts it to lowercase and checks if it equals "true". (So you can type True/TRUE/true and it works.)
+
+
+So, if you don’t pass anything from the terminal:
+
+base_url becomes "https://staging.myapp.com"
+
+headless becomes True
+
+
+If you do pass values:
+
+BASE_URL="https://prod.myapp.com" HEADLESS=False pytest -q
+
+Then inside your test:
+
+base_url = "https://prod.myapp.com"
+
+headless = False
+
+
+
