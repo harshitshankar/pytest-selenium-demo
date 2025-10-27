@@ -46,3 +46,10 @@ pytest-selenium-demo/
 - This demo uses `webdriver-manager` to download ChromeDriver automatically for local runs.
 - For CI (Jenkins), set `headless` to true in conftest or use env variables.
 - Intentionally simple pages; replace URLs and locators according to your AUT.
+
+
+## Step 1: Run pytest and generate allure results
+pytest -q --alluredir=reports
+
+##Step 2: Serve allure report
+allure serve reports
