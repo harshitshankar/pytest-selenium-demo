@@ -53,3 +53,13 @@ pytest -q --alluredir=reports
 
 ##Step 2: Serve allure report
 allure serve reports
+
+
+##   How to choose what goes inside:
+
+After installing your needed packages manually (like Selenium, Pytest, etc.), just run:
+
+pip freeze > requirements.txt
+
+This captures your current environment versions into the file.
+pip freeze > requirements.txt
