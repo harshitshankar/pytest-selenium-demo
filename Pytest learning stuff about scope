@@ -1,0 +1,233 @@
+🧩 What “fixture scope” means
+
+👉 Scope decides how long a fixture will live —
+i.e., how often pytest will create and destroy that fixture.
+
+So:
+
+"function" → created for each test function
+
+"class" → created once per test class
+
+"module" → created once per Python file
+
+"session" → created once for the entire pytest run
+
+
+
+---
+
+We’ll use a simple print-based demo to make it obvious.
+
+👇 Create this structure:
+
+tests/
+  ├─ test_scope_demo1.py
+  ├─ test_scope_demo2.py
+conftest.py
+
+
+---
+
+🧪 Example conftest.py
+
+import pytest
+
+@pytest.fixture(scope="function")
+def func_fixture():
+    print("\n[SETUP] function fixture created")
+    yield
+    print("[TEARDOWN] function fixture destroyed")
+
+@pytest.fixture(scope="class")
+def class_fixture():
+    print("\n[SETUP] class fixture created")
+    yield
+    print("[TEARDOWN] class fixture destroyed")
+
+@pytest.fixture(scope="module")
+def module_fixture():
+    print("\n[SETUP] module fixture created")
+    yield
+    print("[TEARDOWN] module fixture destroyed")
+
+@pytest.fixture(scope="session")
+def session_fixture():
+    print("\n[SETUP] session fixture created")
+    yield
+    print("[TEARDOWN] session fixture destroyed")
+
+
+---
+
+🧪 Example test file 1 → tests/test_scope_demo1.py
+
+def test_one(func_fixture, class_fixture, module_fixture, session_fixture):
+    print("Running test_one")
+
+def test_two(func_fixture, class_fixture, module_fixture, session_fixture):
+    print("Running test_two")
+
+
+---
+
+🧪 Example test file 2 → tests/test_scope_demo2.py
+
+def test_three(func_fixture, class_fixture, module_fixture, session_fixture):
+    print("Running test_three")
+
+
+---
+
+Now run:
+
+pytest -s
+
+(-s lets print statements show)
+
+
+---
+
+🧾 Output (simplified & explained)
+
+[SETUP] session fixture created        <-- created once for full pytest run
+
+[SETUP] module fixture created         <-- created once for test_scope_demo1.py
+
+[SETUP] class fixture created          <-- created once per class (no class yet, pytest treats functions individually)
+[SETUP] function fixture created
+Running test_one
+[TEARDOWN] function fixture destroyed  <-- after test_one only
+
+[SETUP] function fixture created
+Running test_two
+[TEARDOWN] function fixture destroyed
+[TEARDOWN] class fixture destroyed
+[TEARDOWN] module fixture destroyed
+
+[SETUP] module fixture created         <-- new module (test_scope_demo2.py)
+[SETUP] class fixture created
+[SETUP] function fixture created
+Running test_three
+[TEARDOWN] function fixture destroyed
+[TEARDOWN] class fixture destroyed
+[TEARDOWN] module fixture destroyed
+
+[TEARDOWN] session fixture destroyed   <-- done after all tests
+
+
+---
+
+📘 Now understand each scope with real meaning
+
+Scope	Lifetime	When to use	Example Output
+
+"function"	Setup/teardown for every test	Browser per test	Created before each test and destroyed after each test
+"class"	Setup/teardown once per test class	Reuse same browser for all methods in one class	Created once per class, destroyed after class
+"module"	Setup/teardown once per test file	Share browser or data across all tests in same file	Created once per file, destroyed after all tests in file
+"session"	Setup/teardown once for full pytest run	Global setup (e.g., DB connection, config, report setup)	Created once before first test, destroyed after all tests
+
+
+
+---
+
+🧠 Real Selenium Example (to relate with your work)
+
+✅ function scope (most common)
+
+Each test gets a fresh browser → clean state.
+
+@pytest.fixture(scope="function")
+def driver():
+    driver = webdriver.Chrome()
+    yield driver
+    driver.quit()
+
+✅ Use when: each test should open/close its own browser.
+
+
+---
+
+✅ class scope
+
+All tests in the same test class share one browser.
+
+@pytest.fixture(scope="class")
+def driver(request):
+    driver = webdriver.Chrome()
+    request.cls.driver = driver
+    yield
+    driver.quit()
+
+@pytest.mark.usefixtures("driver")
+class TestLogin:
+    def test_open_page(self):
+        self.driver.get("https://example.com")
+
+    def test_do_login(self):
+        self.driver.find_element(...).click()
+
+🧠 Browser stays open for both tests in that class → faster execution.
+
+
+---
+
+✅ module scope
+
+All tests in same file share one browser.
+
+@pytest.fixture(scope="module")
+def driver():
+    driver = webdriver.Chrome()
+    yield driver
+    driver.quit()
+
+🧠 Useful when all tests in the file run on the same app section.
+
+
+---
+
+✅ session scope
+
+Browser or config reused for all tests in the run.
+
+@pytest.fixture(scope="session")
+def config():
+    print("Loading global config...")
+    return {"base_url": "https://example.com"}
+
+🧠 Used for environment setup (e.g., DB connections, configs, test data).
+
+
+---
+
+🧩 Mini Summary
+
+Scope	Created	Destroyed	Example Use
+
+function	Before each test	After each test	Browser per test
+class	Before first method in class	After all methods	Shared browser for that class
+module	Before first test in file	After all tests in that file	Reuse data/session per module
+session	Before first test of entire run	After all tests complete	Global setup/config
+
+
+
+---
+
+🎯 Interview Tip
+
+If interviewer asks:
+
+> "What scope do you use for Selenium WebDriver fixture and why?"
+
+
+
+You say:
+
+> “Mostly function scope, because I want each test to have an isolated browser session to avoid data conflicts.
+However, if tests are read-only or performance is critical, I can use class or module scope to reuse one browser across multiple tests.”
+
+
+
+
+---
